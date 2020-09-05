@@ -1,0 +1,49 @@
+-
+  name: Create an EC2 Instance
+  tasks:
+    - name: Launch Instance
+      ec2:
+        key_name: "{{ mykey }}"
+        aws_access_key: "{{ access_key }}"
+        aws_secret_key: "{{ secret_key }}"
+        region: "{{ aws_region }}"
+        image: "{{ image_id }}"
+        instance_type: "{{ instance_type }}"
+        assign_public_ip: yes
+      register: ec2
+    
+    - name: displaying the created instances
+      debug: msg="{{ item.instance_id }}"
+      with_items: "{{ ec2.instances }}"
+    
+    - name: Add new instance to host group
+      add_host: hostname={{ item.public_ip }} groupname=aws_ec2
+      with_items: '{{ ec2.instances }}'
+    
+    - name: Wait for instance to start
+      wait_for: host={{ item.public_dns_name }} port=22 delay=60 timeout=320 state=started
+      with_items: '{{ ec2.instances }}'
+
+-
+  name: Install httpd web services
+  hosts: aws_ec2
+  tasks:
+    - name: install httpd
+      yum:
+        name: httpd
+        state: present
+    - name: start httpd service
+      service:
+        name: httpd
+        state: started
+    - name: enable httpd service
+      service:
+        name: httpd
+        enabled: yes
+
+-
+  name: Copy the sample web page to html direcotry
+  hosts: aws_ec2
+  copy:
+    src: /tmp/web_application.yaml
+    dest: /var/www/html/
