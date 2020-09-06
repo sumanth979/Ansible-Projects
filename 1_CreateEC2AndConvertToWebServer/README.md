@@ -8,6 +8,12 @@ This Project handles an ansible deployment which includes the following:
 
 ## Commands Used
 
+
+##### To check the deployment in ansible playbook
+```
+ansible-playbook playbook.yaml -i inventory.txt --check
+```
+
 ##### To deploy ansible playbook
 ```
 ansible-playbook playbook.yaml -i inventory.txt
