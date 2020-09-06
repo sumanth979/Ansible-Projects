@@ -1,0 +1,79 @@
+# AWS EC2 playbook
+
+- name: Create all the resources required for Launching an ec2 instance
+  hosts: localhost
+  vars_files:
+    - aws_variables
+  tasks:
+    - name: Create an ssh key
+      openssh_keypair:
+        path: ~/.ssh/my_ec2_key
+        force: True
+
+    - name: Upload public key to AWS
+      ec2_key:
+        name: "{{ key_name }}"
+        key_material: "{{ lookup('file', '/root/.ssh/{{ key_name }}.pub') }}"
+        region: "{{ aws_region }}"
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+
+    - name: Create security group
+      ec2_group:
+        name: "{{ security_group_name }}"
+        description: "Sec group for ec2 instances"
+        vpc_id: "{{ vpc_id }}"
+        region: "{{ aws_region }}"
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        rules:
+          - proto: tcp
+            ports:
+              - 22
+            cidr_ip: 0.0.0.0/0
+            rule_desc: allow all on ssh port
+      register: created_security_group
+
+    - name: Launch EC2 Instance using ansible
+      ec2:
+        key_name: "{{ key_name }}"
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+        region: "{{ aws_region }}"
+        image: "{{ image_id }}"
+        instance_type: "{{ instance_type }}"
+        count: 1
+        wait: yes
+        group_id: "{{ created_security_group.group_id }}"
+        vpc_subnet_id: "{{ vpc_subnet_id }}"
+        assign_public_ip: yes
+      register: ec2
+    
+    - name: Wait for instance to come up
+      delegate_to: "{{ item.public_dns_name }}"
+      wait_for_connection: 
+        delay: 60
+        timeout: 300
+      loop: "{{ ec2.instances }}"
+
+-
+  name: Delete the created resources
+  hosts: localhost
+  vars_files:
+    - aws_variables
+  tasks:
+    - name: Terminate the created ec2 instances that were previously launched
+      ec2:
+        state: absent
+        instance_ids: "{{ ec2.instance_ids }}"
+    
+    - name: Delete the security group created
+      ec2_group:
+        state: absent
+        region: "{{ aws_region }}"
+        group_id: "{{ created_security_group.group_id }}"
+    
+    - name: Remove the uploaded SSH key
+      ec2_key:
+        name: "{{ key_name }}"
+        state: absent
