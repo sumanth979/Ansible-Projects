@@ -1,0 +1,8 @@
+key_name:  
+aws_access_key: 
+aws_secret_key: 
+aws_region: 
+image_id: 
+instance_type:
+security_group_id:
+vpc_subnet_id:
